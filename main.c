@@ -125,8 +125,6 @@ int main(void)
 	
 	// Heater pin
 	dio_set_direction(DIO_PORTB, PIN_0, DIO_DIRECTION_OUTPUT);
-	// Buzzer Pin
-	dio_set_direction(DIO_PORTC, PIN_5, DIO_DIRECTION_OUTPUT);
 
 	while (1)
 	{
