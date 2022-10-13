@@ -18,14 +18,14 @@
 #include "BIT_MATH.h"
 #include "DCmotor.h"
 
-int time1;
-int time2;
+int static time1;
+int static time2;
 int i;
 
+// Timer used to count down every one second using overflow mode
 ISR(TIMER0_OVF_vect)
 {
 	static uint16_t counter = 0;
-	static uint16_t counter2 = 0;
 	counter++;
 	if (counter == 489)
 	{
@@ -45,31 +45,62 @@ ISR(TIMER0_OVF_vect)
 		{
 			Timer0_deinit();
 			set_direction(_STOP_);
-			dio_set_level(DIO_PORTB, PIN_5, HIGH);
+			dio_set_level(DIO_PORTB, PIN_1, HIGH);
 		}
 
 		counter = 0;
 	}
 }
 
+// Interrupt 2 used to initiate the whole process by initiating the timer only if the timer is set by the user
 ISR(INT2_vect)
 {
 	if (dio_get_level(DIO_PORTB, PIN_2) == LOW)
 	{
-
-		Timer0_voidInit();
-		set_direction(SET_RIGHT);
+		
+		if (time1 != 0 || time2 != 0)
+		{
+			Timer0_voidInit();
+			set_direction(SET_RIGHT);
+			dio_set_level(DIO_PORTB, PIN_0, HIGH);
+		}
+		
 	}
 }
 
-ISR(INT0_vect)
+// Interrupt 1 used to pause the timer if it's running and reset it if it's paused
+ISR(INT1_vect)
 {
-	if (dio_get_level(DIO_PORTD, PIN_2) == LOW)
+	if (dio_get_level(DIO_PORTD, PIN_3) == LOW)
 	{
+		while (dio_get_level(DIO_PORTD,PIN_7) == HIGH && dio_get_level(DIO_PORTD,PIN_6) == HIGH)
+		{
+			time1 = 0;
+			time2 = 0;
+			execute(4, 0);
+			execute(3, 0);
+			Timer0_deinit();
+			dio_set_level(DIO_PORTD,PIN_7, LOW);
+			dio_set_level(DIO_PORTD,PIN_6, LOW);
+		}
 		Timer0_deinit();
 		set_direction(_STOP_);
 	}
 }
+
+// Interrupt 0 used to make sure that the door is closed when the pin is set to high
+ISR(INT0_vect)
+{
+	if (dio_get_level(DIO_PORTD, PIN_2) == LOW)
+	{
+		while(dio_get_level(DIO_PORTD, PIN_2) == LOW)
+		{
+			Timer0_deinit();
+			set_direction(_STOP_);
+		}
+	}
+}
+
 
 int main(void)
 {
@@ -92,17 +123,22 @@ int main(void)
 	dio_set_direction(DIO_PORTB, PIN_2, DIO_DIRECTION_INPUT);
 	dio_set_level(DIO_PORTB, PIN_2, HIGH);
 	
-	// buzzer pin
+	// Heater pin
+	dio_set_direction(DIO_PORTB, PIN_0, DIO_DIRECTION_OUTPUT);
+	// Buzzer Pin
 	dio_set_direction(DIO_PORTC, PIN_5, DIO_DIRECTION_OUTPUT);
-
-	for (i = 1; i >= 0; i--)
-	{
-		time2 = time1;
-		time1 = keypad_pressed();
-		execute(4 - i, time1);
-	}
 
 	while (1)
 	{
+		// Prompting the timer from the user
+		while(time1 == 0 && time2 == 0)
+		{
+			for (i = 1; i >= 0; i--)
+			{
+				time2 = time1;
+				time1 = keypad_pressed();
+				execute(4 - i, time1);
+			}
+		}
 	}
 }
